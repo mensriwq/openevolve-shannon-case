@@ -1,0 +1,95 @@
+max_iterations: 1000
+checkpoint_interval: 10
+random_seed: 42
+log_level: "INFO"
+diff_based_evolution: true
+
+shannon:
+  n: 7
+  k: 5
+  delta_semantic_survival_threshold: 1
+  target_bound: 367
+
+# Hyperparameter Optimization Settings
+hpo:
+  enabled: true
+  trigger_metric: "n_eff"
+  objective_metric: "n_eff"
+  ### CRITICAL WARNING: Only human have access to modify this
+  ### Absolutely NO modifications allowed
+  threshold_score: f"{(shannon.n // 2) ** shannon.k + 17}"  # AI is strictly PROHIBITED from modifying this parameter.
+  ### CRITICAL WARNING END
+  num_trials: 50
+  time_limit: 360.0
+  n_jobs: "auto"
+
+description: |
+  Problem: Construct the largest possible independent set in the k-th strong product of the cycle graph C_n (Shannon Capacity).
+  Target: C_{{shannon.n}}^{{shannon.k}}.
+  The goal is to maximize the size of the independent set (alpha(G^k)).
+
+observer_config:
+  optimizing_target: "n_eff: the size of independent set"
+  output_name: "points"
+  output_description: "A list of k-dimensional coordinate tuples representing an independent set in the graph C_n^k."
+  type_signature: "(n: int, k: int) -> list"
+  execution:
+    entry_point: "generate_independent_set"
+    args:
+      - key: "shannon.n"
+      - key: "shannon.k"
+
+llm:
+  api_base: "https://generativelanguage.googleapis.com/v1beta/openai/"
+  max_tokens: 65536
+  timeout: 300
+  models:
+    - name: "gemini-3.1-flash-lite-preview"
+      weight: 0.3
+    - name: "gemini-3-flash-preview"
+      weight: 0.5
+    - name: "gemini-3-pro-preview"
+      weight: 0.1
+    - name: "gemini-3.1-pro-preview"
+      weight: 0.1
+
+database:
+  population_size: 200
+  num_islands: 8
+  migration_interval: 150
+  feature_bins: 
+    coordinate_std: 10
+    neighbor_count_std: 10
+    semantics: 15
+  feature_dimensions: ["semantics", "coordinate_std", "neighbor_count_std"]
+  semantic_survival_metric: "n_eff"
+  semantic_survival_threshold: f"{(shannon.n // 2) ** shannon.k + shannon.delta_semantic_survival_threshold}"
+  embedding_model: "gemini-embedding-001"
+
+evaluator:
+  parallel_evaluations: 6
+  enable_artifacts: true
+  use_llm_feedback: false
+  cascade_evaluation: false
+  timeout: 6000
+
+prompt:
+  system_message: |
+    You are an expert mathematician and algorithm designer specializing in Combinatorics and Extremal Graph Theory.
+    Your objective is to find the maximum independent set of the k-th strong product of the cycle graph, **C_{n}^{k}**.
+    
+    Target: n={{shannon.n}}, k={{shannon.k}}.
+    Goal: Maximize the size of the independent set.
+    
+    ### Core Constraints
+    *   **Independence**: All points in the returned set MUST be independent in C_n^k. Any adjacent pairs will result in a score of zero.
+    *   **Shannon Bound**: Constructions must respect the theoretical Shannon capacity limits.
+    *   **Resources**: You have a 20.0s time limit and 512MB RAM. Optimize for efficiency.
+    
+    ### Known Research Directions
+    To approach this problem, researchers have explored several avenues:
+    1.  **Structural Greedy Approaches**: Using priority functions to guide point selection.
+    2.  **Algebraic & Code-based Constructions**: Defining sets via polynomials, linear codes, or lattices in Z_n^k.
+    3.  **Local Search & Meta-heuristics**: Refining sets via simulated annealing or other optimization techniques.
+    
+    Your task is to implement an innovative algorithm to find a large independent set for the specified n and k. Use `tunable` where appropriate to allow the evolutionary process to optimize your strategy.
